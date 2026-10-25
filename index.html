@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>沈阳市土地资源三维可视化 · 国土空间</title>
+<link rel="icon" href="data:," />
+<link rel="stylesheet" href="vendor/fonts.css" />
+<style>
+/* ============================================================
+   沈阳市土地资源三维可视化大屏  ·  视觉稿 1920 × 1080
+   ============================================================ */
+:root{
+  --bg-deep:#03080f;
+  --bg-mid:#061826;
+  --line:rgba(84,190,255,.16);
+  --line-strong:rgba(96,208,255,.38);
+  --cyan:#41cdff;
+  --cyan-dim:#2b93c4;
+  --text:#e7f5ff;
+  --text-2:#8fb6cf;
+  --text-3:#5c7f96;
+  --green:#2fe6a8;
+  --gold:#f5c451;
+  --violet:#9d8bf0;
+  --f-cn:'HarmonyOS Sans SC','Source Han Sans SC','Noto Sans SC','Microsoft YaHei','PingFang SC',sans-serif;
+  --f-num:'Rajdhani','Bahnschrift','DIN Alternate','Arial Narrow',var(--f-cn);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#01060c;overflow:hidden}
+body{
+  font-family:var(--f-cn);
+  color:var(--text);
+  -webkit-font-smoothing:antialiased;
+  display:flex;align-items:center;justify-content:center;
+}
+#stage{width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden}
+/* 竖屏小屏提示：大屏是固定 1920×1080 画布，竖屏会被压成一条 */
+#rot{
+  position:fixed;left:0;right:0;bottom:0;z-index:99;
+  padding:9px 14px;text-align:center;
+  font-size:12px;letter-spacing:.5px;color:#bfe8ff;
+  background:linear-gradient(180deg,rgba(4,20,32,.0),rgba(4,20,32,.92) 40%);
+  border-top:1px solid rgba(84,190,255,.22);
+  pointer-events:none;
+}
+#rot b{color:#41cdff}
+#screen{
+  position:relative;width:1920px;height:1080px;flex:0 0 auto;
+  transform-origin:center center;
+  background:
+    radial-gradient(1200px 700px at 50% 40%, #0a2842 0%, #061a2b 42%, #030b14 78%, #02070d 100%);
+  overflow:hidden;
+  box-shadow:0 0 120px rgba(0,0,0,.9) inset;
+}
+/* 背景：经纬网格 + 光斑 */
+.bg-grid{
+  position:absolute;inset:0;pointer-events:none;
+  background-image:
+    linear-gradient(rgba(70,170,255,.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(70,170,255,.055) 1px, transparent 1px);
+  background-size:60px 60px,60px 60px;
+  mask-image:radial-gradient(circle at 50% 46%, rgba(0,0,0,.9) 0%, rgba(0,0,0,.25) 55%, transparent 78%);
+  -webkit-mask-image:radial-gradient(circle at 50% 46%, rgba(0,0,0,.9) 0%, rgba(0,0,0,.25) 55%, transparent 78%);
+}
+.bg-glow{
+  position:absolute;left:50%;top:48%;width:1500px;height:900px;
+  transform:translate(-50%,-50%);pointer-events:none;
+  background:radial-gradient(ellipse at center, rgba(38,150,220,.16) 0%, rgba(20,80,130,.07) 42%, transparent 70%);
+  filter:blur(8px);
+}
+.vignette{
+  position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 45%, transparent 45%, rgba(1,6,12,.55) 88%, rgba(1,6,12,.92) 100%);
+}
+
+/* ---------------- 顶部标题 ---------------- */
+header.hd{
+  position:absolute;left:0;top:0;width:100%;height:104px;z-index:20;
+  display:flex;align-items:center;justify-content:space-between;padding:0 34px;
+}
+header.hd::after{
+  content:'';position:absolute;left:34px;right:34px;bottom:0;height:1px;
+  background:linear-gradient(90deg, transparent, rgba(80,200,255,.45) 18%, rgba(120,225,255,.75) 50%, rgba(80,200,255,.45) 82%, transparent);
+}
+.hd-left,.hd-right{width:440px;display:flex;flex-direction:column;gap:6px}
+.hd-right{align-items:flex-end}
+.hd-left .org{font-size:14px;letter-spacing:2px;color:var(--text-2)}
+.hd-left .org b{color:var(--cyan);font-weight:600}
+.hd-left .tag{font-size:12px;letter-spacing:1px;color:var(--text-3)}
+.hd-right .date{font-family:var(--f-num);font-size:20px;letter-spacing:1.5px;color:var(--text)}
+.hd-right .st{font-size:12px;letter-spacing:1px;color:var(--text-3)}
+.hd-center{flex:1;text-align:center;position:relative}
+.hd-center h1{
+  font-size:38px;font-weight:700;letter-spacing:8px;line-height:1.1;
+  background:linear-gradient(180deg,#ffffff 8%, #b9eaff 46%, #4fb6e8 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:0 0 42px rgba(64,190,255,.35);
+}
+.hd-center .sub{
+  margin-top:8px;font-family:var(--f-num);font-size:11.5px;letter-spacing:4.2px;color:rgba(120,190,225,.62)
+}
+.hd-center::before{
+  content:'';position:absolute;left:50%;top:-26px;transform:translateX(-50%);
+  width:520px;height:120px;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 100%, rgba(70,200,255,.20), transparent 68%);
+}
+
+/* ---------------- 主区域 ---------------- */
+main.wrap{position:absolute;left:0;top:104px;width:1920px;height:900px;display:flex;gap:20px;padding:0 20px;z-index:10}
+.col{width:380px;display:flex;flex-direction:column;gap:16px;min-width:0}
+.col.center{flex:1;width:auto;position:relative}
+
+/* ---------------- 面板 ---------------- */
+.panel{
+  position:relative;display:flex;flex-direction:column;min-height:0;
+  background:linear-gradient(180deg, rgba(16,56,88,.42) 0%, rgba(7,26,42,.30) 58%, rgba(4,16,26,.26) 100%);
+  border:1px solid var(--line);
+  border-radius:2px;
+  backdrop-filter:blur(2px);
+  box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 18px 40px -28px rgba(0,0,0,.9);
+}
+.panel::before{
+  content:'';position:absolute;left:0;top:0;width:100%;height:1px;
+  background:linear-gradient(90deg, rgba(80,200,255,.55), rgba(80,200,255,.05) 60%, transparent);
+}
+.panel::after{
+  content:'';position:absolute;right:-1px;bottom:-1px;width:16px;height:16px;pointer-events:none;
+  border-right:1px solid rgba(110,215,255,.55);border-bottom:1px solid rgba(110,215,255,.55);
+}
+.panel-hd{
+  height:38px;display:flex;align-items:center;gap:9px;padding:0 14px;flex:0 0 auto;
+  border-bottom:1px solid rgba(84,190,255,.12);
+}
+.panel-hd .acc{
+  width:3px;height:14px;flex:0 0 auto;border-radius:1px;
+  background:linear-gradient(180deg,#8ef1ff,#1a8cff);
+  box-shadow:0 0 12px rgba(70,215,255,.9);
+}
+.panel-hd h3{font-size:15px;font-weight:600;letter-spacing:1.6px;color:#dff2ff}
+.panel-hd .en{margin-left:auto;font-family:var(--f-num);font-size:10.5px;letter-spacing:2px;color:rgba(110,170,205,.55)}
+.panel-bd{padding:14px;flex:1;min-height:0;display:flex;flex-direction:column}
+
+/* ---------------- 总览 ---------------- */
+.ov-eyebrow{font-size:12px;letter-spacing:2px;color:var(--text-2);display:flex;align-items:center;gap:7px}
+.ov-eyebrow i{width:5px;height:5px;border-radius:50%;background:var(--cyan);box-shadow:0 0 9px var(--cyan);display:inline-block}
+.ov-num{display:flex;align-items:baseline;gap:8px;margin:6px 0 2px}
+.ov-num b{
+  font-family:var(--f-num);font-weight:700;font-size:62px;line-height:1;letter-spacing:1px;
+  background:linear-gradient(180deg,#ffffff 0%, #9fe3ff 55%, #35a8e0 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.ov-num span{font-size:16px;color:var(--text-2);letter-spacing:1px}
+.ov-note{font-size:11.5px;color:var(--text-3);letter-spacing:.6px}
+.ov-cells{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:auto}
+.ov-cell{
+  border:1px solid rgba(84,190,255,.14);border-radius:2px;padding:9px 8px 8px;
+  background:linear-gradient(180deg, rgba(28,92,138,.22), rgba(10,34,54,.10));
+}
+.ov-cell b{font-family:var(--f-num);font-size:23px;font-weight:600;color:#cdefff;line-height:1;display:block}
+.ov-cell b em{font-size:11px;font-style:normal;color:var(--text-2);margin-left:2px;letter-spacing:.5px}
+.ov-cell span{display:block;margin-top:6px;font-size:11px;color:var(--text-3);letter-spacing:.4px}
+
+/* ---------------- 三大类用地 ---------------- */
+.land-flex{display:flex;align-items:center;gap:14px;flex:1;min-height:0}
+.donut-wrap{position:relative;width:152px;height:152px;flex:0 0 auto}
+.donut-wrap svg{transform:rotate(-90deg);width:100%;height:100%}
+.donut-wrap .track{fill:none;stroke:rgba(90,160,200,.12);stroke-width:13}
+.donut-wrap .seg{fill:none;stroke-width:13;stroke-linecap:butt;transition:stroke-width .3s}
+.donut-mid{
+  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px
+}
+.donut-mid b{font-family:var(--f-num);font-size:29px;font-weight:700;color:#eaf9ff;line-height:1}
+.donut-mid b em{font-size:11px;font-style:normal;color:var(--text-2);margin-left:2px}
+.donut-mid span{font-size:10.5px;letter-spacing:1px;color:var(--text-3)}
+.land-list{flex:1;display:flex;flex-direction:column;gap:11px;min-width:0}
+.land-row{display:flex;flex-direction:column;gap:5px}
+.land-row .t{display:flex;align-items:baseline;gap:7px;font-size:12.5px;color:#cfe6f3}
+.land-row .t i{width:7px;height:7px;border-radius:1px;flex:0 0 auto;transform:rotate(45deg)}
+.land-row .t b{margin-left:auto;font-family:var(--f-num);font-size:16px;font-weight:600}
+.land-row .t s{margin-left:5px;text-decoration:none;font-family:var(--f-num);font-size:11.5px;color:var(--text-3)}
+.land-bar{height:4px;background:rgba(80,150,190,.13);position:relative;overflow:hidden}
+.land-bar i{position:absolute;left:0;top:0;height:100%;display:block}
+.land-bar i::after{
+  content:'';position:absolute;right:0;top:-1px;width:2px;height:6px;background:#fff;box-shadow:0 0 8px #fff;
+}
+
+/* ---------------- 地貌格局 ---------------- */
+.geo-rows{display:flex;flex-direction:column;gap:12px;flex:1;justify-content:center}
+.geo-row{display:flex;align-items:center;gap:10px}
+.geo-row .nm{width:96px;flex:0 0 auto;font-size:12.5px;color:#cfe6f3;letter-spacing:.5px}
+.geo-row .nm small{display:block;font-size:10.5px;color:var(--text-3);margin-top:2px;letter-spacing:0}
+.geo-track{flex:1;height:22px;position:relative;background:linear-gradient(90deg, rgba(60,130,175,.10), rgba(60,130,175,.02))}
+.geo-track i{
+  position:absolute;left:0;top:0;height:100%;
+  background:linear-gradient(90deg, rgba(255,255,255,0) 0%, currentColor 100%);
+  opacity:.34;
+}
+.geo-track u{
+  position:absolute;left:0;top:0;height:100%;width:2px;background:currentColor;box-shadow:0 0 10px currentColor;
+}
+.geo-track em{
+  position:absolute;left:0;top:0;height:100%;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;
+  font-family:var(--f-num);font-size:14px;font-weight:600;font-style:normal;color:#eaf9ff;
+}
+.geo-foot{
+  margin-top:10px;font-size:11px;line-height:1.7;color:var(--text-3);letter-spacing:.3px;
+  border-left:2px solid rgba(84,190,255,.35);padding-left:8px;
+}
+
+/* ---------------- 2026 结构 ---------------- */
+.struct{display:flex;flex-direction:column;gap:9px;flex:1;justify-content:center}
+.s-row{display:flex;align-items:center;gap:9px;font-size:12px}
+.s-row .nm{width:82px;flex:0 0 auto;color:#cfe6f3;letter-spacing:.4px;display:flex;align-items:center;gap:5px}
+.s-row .nm i{width:4px;height:4px;border-radius:50%;flex:0 0 auto}
+.s-track{flex:1;height:9px;position:relative;background:rgba(70,140,180,.10);overflow:hidden}
+.s-track i{
+  position:absolute;left:0;top:0;height:100%;
+  background:linear-gradient(90deg, rgba(65,205,255,.15), var(--c));box-shadow:0 0 12px -2px var(--c);
+}
+.s-track i::after{content:'';position:absolute;right:0;top:0;width:10px;height:100%;background:linear-gradient(90deg,transparent,#fff);opacity:.55}
+.s-val{width:92px;flex:0 0 auto;text-align:right;font-family:var(--f-num);font-size:13.5px;font-weight:600;color:#dff2ff}
+.s-val s{text-decoration:none;font-size:10px;color:var(--text-3);margin-left:3px}
+
+/* ---------------- 三区三线 ---------------- */
+.bl-list{display:flex;flex-direction:column;gap:10px}
+.bl{
+  display:flex;align-items:center;gap:10px;padding:9px 10px;
+  border:1px solid rgba(84,190,255,.13);border-radius:2px;
+  background:linear-gradient(90deg, rgba(30,96,140,.20), rgba(10,32,50,.05));
+}
+.bl .ic{width:26px;height:26px;flex:0 0 auto;display:grid;place-items:center;border-radius:2px;color:#9fe3ff;
+  background:rgba(50,150,210,.15);border:1px solid rgba(84,190,255,.22)}
+.bl .ic svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.4}
+.bl .tx{flex:1;min-width:0}
+.bl .tx p{font-size:12.5px;color:#cfe6f3;letter-spacing:.4px}
+.bl .tx span{display:block;font-size:10.5px;color:var(--text-3);margin-top:3px;letter-spacing:.3px}
+.bl .vv{font-family:var(--f-num);font-size:18px;font-weight:600;color:#eaf9ff;white-space:nowrap}
+.bl .vv em{font-size:10.5px;font-style:normal;color:var(--text-2);margin-left:2px}
+.bl-foot{margin-top:10px;font-size:10.5px;line-height:1.6;color:var(--text-3);letter-spacing:.2px}
+.bl-foot b{color:#9fd8f0;font-weight:500}
+
+/* ---------------- 中间：3D 舞台 ---------------- */
+#mapStage{position:absolute;inset:0;overflow:hidden}
+#mapStage canvas{display:block;width:100%;height:100%}
+/* 三维场景加载中 / 加载失败的兜底层（脚本没跑起来时它就是唯一可见的东西） */
+.boot{
+  position:absolute;inset:0;z-index:7;
+  display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(70% 55% at 50% 52%, rgba(8,36,60,.94), rgba(3,12,20,.97));
+  transition:opacity .6s ease;
+}
+.boot.is-done{opacity:0;pointer-events:none}
+.boot-in{display:flex;flex-direction:column;align-items:center;gap:12px;
+  max-width:580px;padding:0 30px;text-align:center}
+.boot-in i{
+  width:26px;height:26px;border-radius:50%;
+  border:2px solid rgba(80,190,255,.20);border-top-color:#41cdff;
+  animation:bspin .9s linear infinite;
+}
+@keyframes bspin{to{transform:rotate(360deg)}}
+.boot-in b{font-size:13px;font-weight:600;letter-spacing:.22em;color:#bfe8ff}
+.boot-in span{font-size:12px;line-height:2.05;color:#6f9cb8;letter-spacing:.04em}
+.boot-in code{
+  font-family:'Rajdhani',monospace;font-size:12.5px;color:#9fe4ff;
+  background:rgba(60,150,220,.14);padding:1px 5px;border-radius:2px;letter-spacing:0;
+}
+.boot.is-err .boot-in i{display:none}
+.boot.is-err .boot-in b{color:#ffb59f}
+.boot.is-err .boot-in span{color:#93a9bb}
+.labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.dlabel{
+  position:absolute;transform:translate(-50%,-50%);
+  font-size:12px;letter-spacing:1.2px;color:rgba(222,244,255,.92);
+  text-shadow:0 0 10px rgba(10,40,70,.95),0 0 3px rgba(0,0,0,.9);
+  white-space:nowrap;transition:opacity .25s, color .2s;
+}
+.dlabel.center-city{color:#ffffff;font-size:12.5px;letter-spacing:2px}
+.dlabel.center-city::before{
+  content:'';position:absolute;left:50%;top:-11px;width:5px;height:5px;border-radius:50%;
+  transform:translateX(-50%);background:#fff;box-shadow:0 0 10px 2px rgba(120,220,255,.9)
+}
+/* 图例 */
+.map-legend{
+  position:absolute;left:16px;top:68px;z-index:6;
+  display:flex;flex-direction:column;gap:9px;padding:11px 13px;
+  background:linear-gradient(180deg, rgba(8,30,48,.62), rgba(5,18,30,.38));
+  border:1px solid rgba(84,190,255,.16);backdrop-filter:blur(3px);
+}
+.map-legend .lt{font-size:10.5px;letter-spacing:2px;color:var(--text-3);margin-bottom:1px}
+.lg-row{display:flex;align-items:center;gap:8px;font-size:11.5px;color:#cfe6f3;letter-spacing:.5px}
+.lg-row i{width:16px;height:8px;flex:0 0 auto;border-radius:1px}
+.lg-row small{color:var(--text-3);font-size:10.5px;letter-spacing:0}
+/* 图层开关 */
+.lg-switch{display:flex;gap:6px}
+.lg-switch b{
+  cursor:pointer;display:flex;align-items:center;gap:5px;
+  padding:3px 8px 3px 6px;font-size:11px;font-weight:400;letter-spacing:.6px;
+  color:rgba(150,190,215,.62);border:1px solid rgba(84,190,255,.16);
+  background:rgba(8,28,44,.5);transition:.22s;user-select:none;
+}
+.lg-switch b i{
+  width:5px;height:5px;border-radius:50%;background:rgba(120,170,200,.4);
+  box-shadow:none;transition:.22s;
+}
+.lg-switch b.on{color:#d8f1ff;border-color:rgba(110,215,255,.42);background:rgba(24,84,124,.42)}
+.lg-switch b.on i{background:#7fe4ff;box-shadow:0 0 7px 1px rgba(120,225,255,.9)}
+.lg-switch b:hover{color:#eaf8ff}
+/* 视角提示 / 控制 */
+.map-tools{
+  position:absolute;right:16px;bottom:14px;z-index:6;display:flex;align-items:center;gap:10px
+}
+.map-tools .hint{font-size:11px;color:var(--text-3);letter-spacing:.6px;text-align:right;line-height:1.6}
+.btn-reset{
+  cursor:pointer;font-family:var(--f-cn);font-size:11.5px;letter-spacing:1px;color:#bfe8ff;
+  padding:7px 13px;border:1px solid rgba(84,190,255,.30);border-radius:2px;
+  background:linear-gradient(180deg, rgba(30,100,150,.35), rgba(10,36,56,.25));
+  transition:.2s;
+}
+.btn-reset:hover{color:#fff;border-color:rgba(130,225,255,.65);box-shadow:0 0 18px -4px rgba(80,210,255,.7)}
+.map-cap{position:absolute;left:16px;top:12px;z-index:6;display:flex;flex-direction:column;gap:4px}
+.map-cap .a{font-size:12.5px;letter-spacing:2px;color:#bfe8ff}
+.map-cap .b{font-family:var(--f-num);font-size:10px;letter-spacing:2.4px;color:rgba(110,170,205,.55)}
+.zone-tag{
+  position:absolute;z-index:5;pointer-events:none;opacity:0;
+  padding:2px 7px;font-size:10.5px;letter-spacing:1px;color:#dff5ff;
+  border:1px solid rgba(120,215,255,.35);border-radius:2px;
+  background:rgba(6,26,42,.55);transition:opacity .3s;
+}
+/* tooltip */
+#tip{
+  position:fixed;z-index:99;pointer-events:none;opacity:0;transform:translate(-50%,-116%);
+  min-width:150px;padding:9px 12px;border-radius:2px;
+  background:linear-gradient(180deg, rgba(9,34,54,.96), rgba(5,20,33,.94));
+  border:1px solid rgba(110,215,255,.42);
+  box-shadow:0 0 26px -6px rgba(60,190,255,.55), 0 14px 30px -18px #000;
+  transition:opacity .16s;
+}
+#tip h4{font-size:13px;font-weight:600;letter-spacing:1.4px;color:#eafaff;margin-bottom:6px}
+#tip .r{display:flex;justify-content:space-between;gap:18px;font-size:11px;color:var(--text-2);line-height:1.9}
+#tip .r b{font-family:var(--f-num);font-size:12.5px;color:#bfe8ff;font-weight:600}
+
+/* ---------------- 底部条 ---------------- */
+footer.bf{
+  position:absolute;left:20px;right:20px;bottom:12px;height:56px;z-index:12;
+  display:flex;align-items:center;gap:16px;padding:0 16px;
+  border:1px solid rgba(84,190,255,.14);
+  background:linear-gradient(90deg, rgba(8,30,48,.55), rgba(6,20,34,.30) 55%, rgba(8,30,48,.45));
+}
+footer.bf .lb{font-size:11px;letter-spacing:2px;color:var(--text-3);flex:0 0 auto;padding-right:16px;border-right:1px solid rgba(84,190,255,.16)}
+.chips{display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1}
+.chip{
+  font-size:11.5px;letter-spacing:.6px;color:#a9cfe4;padding:4px 9px;border-radius:2px;
+  border:1px solid rgba(84,190,255,.14);background:rgba(20,66,100,.20);white-space:nowrap;
+}
+.chip.key{color:#dcf3ff;border-color:rgba(120,215,255,.30);background:rgba(28,92,138,.28)}
+.bf-src{flex:0 0 auto;text-align:right;font-size:10.5px;line-height:1.6;color:var(--text-3);letter-spacing:.2px;max-width:430px}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="screen">
+    <div class="bg-grid"></div>
+    <div class="bg-glow"></div>
+
+    <!-- ============ 顶部 ============ -->
+    <header class="hd">
+      <div class="hd-left">
+        <div class="org">沈阳市<b>自然资源局</b> · 国土空间基础信息平台</div>
+        <div class="tag">SHENYANG NATURAL RESOURCES BUREAU</div>
+      </div>
+      <div class="hd-center">
+        <h1>沈阳市土地资源三维可视化</h1>
+        <div class="sub">SHENYANG LAND RESOURCE · 3D GEO-VISUALIZATION</div>
+      </div>
+      <div class="hd-right">
+        <div class="date">2026 / 10 / 25</div>
+        <div class="st">数据更新：2020—2025 年度国土变更调查</div>
+        <a href="terrain.html" title="切换到浅色地形图版本"
+           style="display:inline-flex;align-items:center;gap:5px;margin-top:8px;padding:4px 10px;
+                  border:1px solid rgba(120,200,255,.34);border-radius:2px;font-size:11px;
+                  color:#8fd6ff;text-decoration:none;letter-spacing:.06em;
+                  background:rgba(20,60,90,.35);transition:all .18s"
+           onmouseover="this.style.borderColor='#4fd0ff';this.style.color='#d6f2ff'"
+           onmouseout="this.style.borderColor='rgba(120,200,255,.34)';this.style.color='#8fd6ff'">
+          地形图版 →
+        </a>
+      </div>
+    </header>
+
+    <!-- ============ 主体 ============ -->
+    <main class="wrap">
+      <!-- ---------- 左列 ---------- -->
+      <div class="col">
+        <section class="panel" style="height:236px">
+          <header class="panel-hd"><i class="acc"></i><h3>土地资源总览</h3><span class="en">OVERVIEW</span></header>
+          <div class="panel-bd">
+            <div class="ov-eyebrow"><i></i>全市国土总面积</div>
+            <div class="ov-num"><b>1929</b><span>万亩</span></div>
+            <div class="ov-note">≈ 12 860 平方公里 · 东北平原复合型地貌城市</div>
+            <div class="ov-cells">
+              <div class="ov-cell"><b>13<em>个</em></b><span>区县（市）</span></div>
+              <div class="ov-cell"><b>20<em>%</em></b><span>森林覆盖率</span></div>
+              <div class="ov-cell"><b>45<em>%</em></b><span>湿地保护率</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" style="height:318px">
+          <header class="panel-hd"><i class="acc"></i><h3>三大类用地结构</h3><span class="en">LAND USE TYPE</span></header>
+          <div class="panel-bd">
+            <div class="land-flex">
+              <div class="donut-wrap">
+                <svg viewBox="0 0 160 160">
+                  <circle class="track" cx="80" cy="80" r="58"></circle>
+                  <circle class="seg" cx="80" cy="80" r="58" stroke="#2fe6a8"
+                          stroke-dasharray="284.9 79.5" stroke-dashoffset="0"></circle>
+                  <circle class="seg" cx="80" cy="80" r="58" stroke="#41cdff"
+                          stroke-dasharray="62.6 301.8" stroke-dashoffset="-290.9"></circle>
+                  <circle class="seg" cx="80" cy="80" r="58" stroke="#f5c451"
+                          stroke-dasharray="9.9 354.5" stroke-dashoffset="-356.5"></circle>
+                </svg>
+                <div class="donut-mid">
+                  <b>79<em>%</em></b>
+                  <span>农用地占比</span>
+                </div>
+              </div>
+              <div class="land-list">
+                <div class="land-row">
+                  <div class="t"><i style="background:#2fe6a8;box-shadow:0 0 9px #2fe6a8"></i>农用地<b style="color:#7df0c4">1527</b><s>万亩 · 79%</s></div>
+                  <div class="land-bar"><i style="width:79%;background:linear-gradient(90deg,rgba(47,230,168,.25),#2fe6a8)"></i></div>
+                </div>
+                <div class="land-row">
+                  <div class="t"><i style="background:#41cdff;box-shadow:0 0 9px #41cdff"></i>建设用地<b style="color:#8fdcff">338</b><s>万亩 · 18%</s></div>
+                  <div class="land-bar"><i style="width:18%;background:linear-gradient(90deg,rgba(65,205,255,.25),#41cdff)"></i></div>
+                </div>
+                <div class="land-row">
+                  <div class="t"><i style="background:#f5c451;box-shadow:0 0 9px #f5c451"></i>未利用地<b style="color:#ffd98a">64</b><s>万亩 · 3%</s></div>
+                  <div class="land-bar"><i style="width:3%;background:linear-gradient(90deg,rgba(245,196,81,.25),#f5c451)"></i></div>
+                </div>
+                <div class="geo-foot" style="margin-top:2px">三调统一底数 · 农用地 : 建设用地 : 未利用地 = <b style="color:#9fd8f0">79 : 18 : 3</b></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" style="flex:1">
+          <header class="panel-hd"><i class="acc"></i><h3>地貌空间格局</h3><span class="en">TERRAIN</span></header>
+          <div class="panel-bd">
+            <div class="geo-rows">
+              <div class="geo-row" style="color:#2fe6a8">
+                <div class="nm">东部低山丘陵<small>生态 · 水源涵养</small></div>
+                <div class="geo-track"><i style="width:20%"></i><u></u><em style="width:20%">20%</em></div>
+              </div>
+              <div class="geo-row" style="color:#41cdff">
+                <div class="nm">中部冲积平原<small>城市 · 产业廊道</small></div>
+                <div class="geo-track"><i style="width:40%"></i><u></u><em style="width:40%">40%</em></div>
+              </div>
+              <div class="geo-row" style="color:#f5c451">
+                <div class="nm">西部平原沙带<small>粮食 · 沙化治理</small></div>
+                <div class="geo-track"><i style="width:40%"></i><u></u><em style="width:40%">40%</em></div>
+              </div>
+            </div>
+            <div class="geo-foot">东山西原、中部平原；旱主水辅、西平北丘。自然资源禀赋区域差异显著。</div>
+          </div>
+        </section>
+      </div>
+
+      <!-- ---------- 中间：3D 地图 ---------- -->
+      <div class="col center">
+        <div id="mapStage">
+          <div class="boot" id="boot">
+            <div class="boot-in">
+              <i></i>
+              <b id="bootTitle">正在加载三维场景</b>
+              <span id="bootMsg">WebGL 与 three.js 初始化中…</span>
+            </div>
+          </div>
+          <div class="labels" id="labels"></div>
+          <div class="map-cap">
+            <div class="a">沈阳市域 · 三维地形挤出</div>
+            <div class="b">DISTRICT EXTRUSION / FLOW LINE / SIDE SWEEP</div>
+          </div>
+          <div class="map-legend">
+            <div class="lt">规划图图层融合</div>
+            <div class="lg-switch">
+              <b class="on" data-layer="1"><i></i>耕地红线</b>
+              <b class="on" data-layer="2"><i></i>用地现状</b>
+            </div>
+            <div class="lg-row" style="margin-top:2px"><i style="background:linear-gradient(90deg,#ffe0a3,#e0a02c)"></i>永久基本农田 <small>773.53 万亩</small></div>
+            <div class="lg-row"><i style="background:linear-gradient(90deg,#4fe0b0,#0f8f66)"></i>林地草地 <small>346.7 万亩</small></div>
+            <div class="lg-row"><i style="background:linear-gradient(90deg,#8fe8ff,#2aa6e8)"></i>水域湿地 <small>辽浑绕阳水系</small></div>
+            <div class="lg-row"><i style="background:linear-gradient(90deg,#dfe9ff,#7f9dd6)"></i>建成区强度 <small>中心城区</small></div>
+            <div class="lt" style="margin-top:8px">区县地貌分区</div>
+            <div class="lg-row"><i style="background:linear-gradient(180deg,#7dffd0,#16b985)"></i>东部低山丘陵 <small>生态涵养</small></div>
+            <div class="lg-row"><i style="background:linear-gradient(180deg,#9ee9ff,#1a9ed6)"></i>中部冲积平原 <small>城市核心</small></div>
+            <div class="lg-row"><i style="background:linear-gradient(180deg,#ffe3a3,#d9a52f)"></i>西部平原沙带 <small>粮食主产</small></div>
+            <div class="lg-row" style="margin-top:2px"><i style="background:linear-gradient(90deg,transparent,#8fefff)"></i>轮廓飞线 <small>市域边界</small></div>
+          </div>
+          <div class="map-tools">
+            <div class="hint">拖拽旋转 · 滚轮缩放<br>悬停区县查看详情</div>
+            <div class="btn-reset" id="btnReset">重置视角</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- 右列 ---------- -->
+      <div class="col">
+        <section class="panel" style="flex:1">
+          <header class="panel-hd"><i class="acc"></i><h3>2026 年土地利用结构</h3><span class="en">LAND STRUCTURE</span></header>
+          <div class="panel-bd">
+            <div class="struct" id="structList">
+              <div class="s-row"><div class="nm"><i style="background:#f5c451"></i>耕地</div><div class="s-track"><i style="width:100%;--c:#f5c451"></i></div><div class="s-val">1150.0<s>59.7%</s></div></div>
+              <div class="s-row"><div class="nm"><i style="background:#2fe6a8"></i>林地</div><div class="s-track"><i style="width:28.8%;--c:#2fe6a8"></i></div><div class="s-val">331.5<s>17.2%</s></div></div>
+              <div class="s-row"><div class="nm"><i style="background:#41cdff"></i>建设用地</div><div class="s-track"><i style="width:24.8%;--c:#41cdff"></i></div><div class="s-val">285.1<s>14.8%</s></div></div>
+              <div class="s-row"><div class="nm"><i style="background:#5f9df5"></i>湿地</div><div class="s-track"><i style="width:11.2%;--c:#5f9df5"></i></div><div class="s-val">129.1<s>6.7%</s></div></div>
+              <div class="s-row"><div class="nm"><i style="background:#3f7fe8"></i>水域水利</div><div class="s-track"><i style="width:9.8%;--c:#3f7fe8"></i></div><div class="s-val">112.4<s>5.8%</s></div></div>
+              <div class="s-row"><div class="nm"><i style="background:#9d8bf0"></i>交通运输</div><div class="s-track"><i style="width:6.4%;--c:#9d8bf0"></i></div><div class="s-val">74.0<s>3.8%</s></div></div>
+              <div class="s-row"><div class="nm"><i style="background:#a5d64a"></i>园地</div><div class="s-track"><i style="width:1.9%;--c:#a5d64a"></i></div><div class="s-val">21.1<s>1.1%</s></div></div>
+              <div class="s-row"><div class="nm"><i style="background:#6fc45a"></i>草地</div><div class="s-track"><i style="width:1.4%;--c:#6fc45a"></i></div><div class="s-val">15.2<s>0.8%</s></div></div>
+            </div>
+            <div class="geo-foot" style="margin-top:8px;font-size:10.5px">注：湿地与水域、未利用地存在交叉统计，分项面积不做加总。</div>
+          </div>
+        </section>
+
+        <section class="panel" style="height:296px">
+          <header class="panel-hd"><i class="acc"></i><h3>三区三线管控</h3><span class="en">SPATIAL CONTROL</span></header>
+          <div class="panel-bd">
+            <div class="bl-list">
+              <div class="bl">
+                <div class="ic"><svg viewBox="0 0 24 24"><path d="M3 19h18M6 19V9l6-4 6 4v10"/></svg></div>
+                <div class="tx"><p>永久基本农田保护红线</p><span>西部平原粮食主产区 · 四级田长制</span></div>
+                <div class="vv">773.53<em>万亩+</em></div>
+              </div>
+              <div class="bl">
+                <div class="ic"><svg viewBox="0 0 24 24"><path d="M4 18c3.5 0 3.5-3 7-3s3.5 3 7 3M4 12c3.5 0 3.5-3 7-3s3.5 3 7 3"/></svg></div>
+                <div class="tx"><p>耕地保有量</p><span>总量稳 · 质量稳 · 格局稳</span></div>
+                <div class="vv">1120.77<em>万亩</em></div>
+              </div>
+              <div class="bl">
+                <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 21c0-6 3-10 8-11-1 7-4 10-8 11zM12 21c0-6-3-10-8-11 1 7 4 10 8 11z"/></svg></div>
+                <div class="tx"><p>生态保护红线</p><span>东部水源涵养 · 辽河廊道 · 棋盘山 · 卧龙湖</span></div>
+                <div class="vv">933.84<em>km²+</em></div>
+              </div>
+            </div>
+            <div class="bl-foot">
+              《沈阳市国土空间总体规划（2021—2035 年）》获批后，<b>三区三线</b>全域落地、上图入库，为土地利用、项目建设、生态保护与执法监管的法定依据。
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- ============ 底部 ============ -->
+    <footer class="bf">
+      <div class="lb">辖 9 区 4 县（市）</div>
+      <div class="chips">
+        <span class="chip key">和平区</span><span class="chip key">沈河区</span><span class="chip key">大东区</span>
+        <span class="chip key">皇姑区</span><span class="chip key">铁西区</span><span class="chip key">苏家屯区</span>
+        <span class="chip key">浑南区</span><span class="chip key">沈北新区</span><span class="chip key">于洪区</span>
+        <span class="chip">新民市</span><span class="chip">辽中区</span><span class="chip">法库县</span><span class="chip">康平县</span>
+      </div>
+      <div class="bf-src">数据来源：第三次全国国土调查（2019 年末统一底数）、2020—2025 年度国土变更调查；<br>《沈阳市国土空间总体规划（2021—2035 年）》</div>
+    </footer>
+
+    <div class="vignette"></div>
+  </div>
+</div>
+
+<div id="tip">
+  <h4 id="tipName">—</h4>
+  <div class="r"><span>地貌分区</span><b id="tipZone">—</b></div>
+  <div class="r"><span>国土面积</span><b id="tipArea">—</b></div>
+</div>
+
+<!-- ============ 地理数据（可直接替换为 sc-datav 的 assets/sc.json） ============ -->
+<script src="data/sy.geo.js"></script>
+<script src="data/sy_outline.geo.js"></script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js",
+    "three/addons/": "./vendor/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls }    from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer }   from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass }       from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass }  from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass }       from 'three/addons/postprocessing/OutputPass.js';
+
+/* ============================================================
+   ① 配置区 —— 适配其他城市时只改这里
+   ============================================================ */
+const CONFIG = {
+  // 地图中心经纬度 / 每经纬度的场景单位（约等于地图高度的 1/9）
+  geo:      { center: [123.118, 42.121], scale: 5.35, yaw: -0.17 },
+  // 相机：position 即需求中的 [0, -5, 12]，Z 轴向上
+  camera:   { position: [0, -7.0, 10.8], target: [0, 0, 0.42], fov: 45 },
+  // 挤出高度（按地貌分区，单位＝场景单位）
+  extrude:  { east: 1.15, mid: 0.76, west: 0.50 },
+  // 飞线起点：沈阳市中心（市府广场一带）
+  hub:      [123.43, 41.80],
+  // 分区配色
+  zone: {
+    east: { color: '#2fe6a8' },
+    mid:  { color: '#41cdff' },
+    west: { color: '#f5c451' }
+  },
+  bloom:    { strength: 0.52, radius: 0.68, threshold: 0.56 },
+  flow:     { speed: 0.055, sweep: 2.2 },
+  // 规划图数据贴图（由 data/prep_texture.py 生成，rect 见 textures/meta.json）
+  tex:      { rect: [-3.09, -5.52, 3.09, 5.52], dir: 'textures/' }
+};
+
+const GEO  = window.SY_GEO;
+const OUTL = window.SY_OUTLINE;
+
+/* ============================================================
+   ② 投影：经纬度 → 场景 XY（Z 为高度，Z-up）
+   ============================================================ */
+const [C_LON, C_LAT] = CONFIG.geo.center;
+const S = CONFIG.geo.scale;
+const COS_LAT = Math.cos(C_LAT * Math.PI / 180);
+const px = lon => (lon - C_LON) * COS_LAT * S;
+const py = lat => (lat - C_LAT) * S;
+
+/* ============================================================
+   ③ 场景
+   ============================================================ */
+const stage = document.getElementById('mapStage');
+const W = () => stage.clientWidth, H = () => stage.clientHeight;
+
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(CONFIG.camera.fov, W() / H(), 0.1, 200);
+camera.up.set(0, 0, 1);                       // Z 轴向上
+camera.position.set(...CONFIG.camera.position);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(W(), H());
+renderer.setClearColor(0x000000, 0);
+stage.insertBefore(renderer.domElement, stage.firstChild);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(...CONFIG.camera.target);
+controls.enableDamping = true;
+controls.dampingFactor = 0.075;
+controls.minDistance = 6;
+controls.maxDistance = 26;
+controls.minPolarAngle = 0.12;
+controls.maxPolarAngle = Math.PI * 0.44;
+controls.enablePan = false;
+controls.update();
+
+/* 后期：泛光 */
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(W(), H()),
+  CONFIG.bloom.strength, CONFIG.bloom.radius, CONFIG.bloom.threshold);
+composer.addPass(bloomPass);
+composer.addPass(new OutputPass());
+
+/* ============================================================
+   ③b 规划图数据贴图（耕地红线图 + 用地现状图）
+   两张《沈阳市国土空间总体规划（2021—2035年）》图件已与经纬度对齐，
+   地类场写入 textures/sy_field.png（R 基本农田 / G 耕地 / B 林草 / A 水域）
+   与 textures/sy_urban.png（建成区强度）。
+   ============================================================ */
+const TEX = { w1: 1, w2: 1, on1: true, on2: true };   // w1 耕地红线 / w2 用地现状（开关过渡用）
+{
+  const loader = new THREE.TextureLoader();
+  const aniso = renderer.capabilities.getMaxAnisotropy();
+  const load = f => {
+    const t = loader.load(CONFIG.tex.dir + f);
+    t.colorSpace = THREE.NoColorSpace;   // 数据贴图，不做 sRGB 转换
+    t.anisotropy = aniso;
+    t.minFilter = THREE.LinearMipmapLinearFilter;
+    t.magFilter = THREE.LinearFilter;
+    t.generateMipmaps = true;
+    return t;
+  };
+  TEX.field = load('sy_field.png');
+  TEX.urban = load('sy_urban.png');
+}
+
+/* ============================================================
+   ④ 工具函数
+   ============================================================ */
+const ringToV2 = ring => ring.map(([lon, lat]) => new THREE.Vector2(px(lon), py(lat)));
+
+function shapeFromPolygon(poly) {
+  // poly = [outerRing, hole1, ...]
+  const shape = new THREE.Shape(ringToV2(poly[0]));
+  for (let i = 1; i < poly.length; i++) shape.holes.push(new THREE.Path(ringToV2(poly[i])));
+  return shape;
+}
+
+function buildExtrude(poly, depth) {
+  const geo = new THREE.ExtrudeGeometry(shapeFromPolygon(poly), {
+    depth, bevelEnabled: false, curveSegments: 1, steps: 1
+  });
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/* ---- 地类场 → 颜色：顶面与侧壁共用同一套配色，避免两者脱节 ----
+   数据贴图已在 Python 侧做过网点清理与软边，这里只负责上色与层次。 */
+const LAND_GLSL = /* glsl */`
+  uniform sampler2D uField;
+  uniform sampler2D uUrban;
+  uniform vec4  uRect;
+  uniform float uW1;
+  uniform float uW2;
+
+  vec4  gF;     // R 永久基本农田 / G 一般耕地 / B 林地草地 / A 水域湿地
+  vec4  gFc;    // 水系单独采样（更锐利）
+  float gU;     // 建成区强度
+
+  void sampleLand(vec2 p, float lod){
+    vec2 uv = (p - uRect.xy) / uRect.zw;
+    gF  = texture2D(uField, uv, lod);
+    gFc = texture2D(uField, uv, max(lod - 1.0, 0.0));
+    gU  = texture2D(uUrban, uv, lod).r;
+  }
+
+  vec3 landColor(){
+    float basic = gF.r * (1.0 - 0.45 * gF.b);   // 基本农田里误判的林斑扣掉
+    vec3  c = vec3(0.0);
+    c += vec3(1.00, 0.66, 0.22) * basic  * 0.78 * uW1;   // 永久基本农田：琥珀
+    c += vec3(0.60, 0.38, 0.20) * gF.g   * 0.50 * uW1;   // 一般耕地：赭石
+    c += vec3(0.10, 0.60, 0.44) * gF.b   * 0.95 * uW2;   // 林地草地：翠玉
+    c += vec3(0.36, 0.82, 1.00) * gFc.a  * 1.90 * uW2;   // 水域湿地：青蓝
+    c += vec3(0.58, 0.74, 0.96) * pow(gU, 1.3) * 0.86 * uW2;  // 建成区：钢蓝
+    return c;
+  }
+`;
+
+/* ---- 顶面材质：中心提亮 + 呼吸波纹 + 规划图数据纹理 ---- */
+function topMaterial(hex) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uColor:  { value: new THREE.Color(hex) },
+      uCenter: { value: new THREE.Vector2(0, 0) },
+      uTime:   { value: 0 },
+      uHover:  { value: 0 },
+      // 两张规划图提取出的地类场
+      uField:  { value: TEX.field },
+      uUrban:  { value: TEX.urban },
+      uRect:   { value: new THREE.Vector4(CONFIG.tex.rect[0], CONFIG.tex.rect[1],
+                 CONFIG.tex.rect[2] - CONFIG.tex.rect[0], CONFIG.tex.rect[3] - CONFIG.tex.rect[1]) },
+      uW1:     { value: 1 },      // 耕地红线图权重
+      uW2:     { value: 1 }       // 用地现状图权重
+    },
+    vertexShader: /* glsl */`
+      varying vec3 vW;
+      varying vec2 vP;
+      void main(){
+        vP = position.xy;                       // 场景坐标（px/py 同源）
+        vec4 w = modelMatrix * vec4(position, 1.0);
+        vW = w.xyz;
+        gl_Position = projectionMatrix * viewMatrix * w;
+      }`,
+    fragmentShader: /* glsl */`
+      uniform vec3  uColor;
+      uniform vec2  uCenter;
+      uniform float uTime;
+      uniform float uHover;
+      varying vec3  vW;
+      varying vec2  vP;
+      ${LAND_GLSL}
+
+      void main(){
+        float d    = length(vW.xy - uCenter);
+        float glow = smoothstep(7.0, 1.0, d);
+        /* 深色覆面：只在中心区域透出分区色，边缘趋于暗蓝 */
+        vec3  col  = vec3(0.004, 0.013, 0.028) + uColor * (0.006 + glow * 0.026);
+
+        /* ── 融合层：耕地红线（图1）+ 用地现状（图2） ───────────────── */
+        sampleLand(vP, 0.9);
+        vec3  tex   = landColor();
+        float known = clamp(gF.r + gF.g + gF.b + gFc.a, 0.0, 1.0);
+
+        /* 轻微浮雕：斑块边界亮一线，平面也有"地形"起伏感 */
+        float lum = gF.r * 0.75 + gF.b * 0.30 + gFc.a * 0.55;
+        float rz  = clamp((dFdx(lum) + dFdy(lum)) * 22.0, -1.0, 1.0);
+        tex *= 1.0 + rz * 0.50;
+
+        col += tex * 0.040;
+
+        // 未分类（河滩、未利用地）：极淡的冷灰，避免出现空洞
+        col += vec3(0.045, 0.095, 0.140) * (1.0 - known) * 0.10;
+
+        /* 极淡的经纬网格纹理，避免大面积纯色 */
+        vec2  gg   = abs(fract(vW.xy * 1.6) - 0.5);
+        float grid = smoothstep(0.455, 0.5, max(gg.x, gg.y));
+        col += vec3(0.055, 0.16, 0.22) * grid * 0.14 * (0.35 + 0.65 * glow);
+        /* 自中心扩散的呼吸波纹 */
+        float w = sin(d * 1.7 - uTime * 1.05) * 0.5 + 0.5;
+        col += uColor * pow(w, 8.0) * 0.035 * glow;
+        col += uColor * 0.30 * uHover;
+        gl_FragColor = vec4(col, 1.0);
+      }`,
+    side: THREE.DoubleSide
+  });
+}
+
+/* ---- 侧面材质：侧边扫光 + 顶面地类色向下渗一点 ---- */
+function sideMaterial(hex, depth) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uColor:  { value: new THREE.Color(hex) },
+      uCenter: { value: new THREE.Vector2(0, 0) },
+      uWave:   { value: 0 },
+      uDepth:  { value: depth },
+      uHover:  { value: 0 },
+      uField:  { value: TEX.field },
+      uUrban:  { value: TEX.urban },
+      uRect:   { value: new THREE.Vector4(CONFIG.tex.rect[0], CONFIG.tex.rect[1],
+                 CONFIG.tex.rect[2] - CONFIG.tex.rect[0], CONFIG.tex.rect[3] - CONFIG.tex.rect[1]) },
+      uW1:     { value: 1 },
+      uW2:     { value: 1 }
+    },
+    vertexShader: /* glsl */`
+      uniform float uDepth;
+      varying float vH;
+      varying vec3  vW;
+      varying vec2  vP;
+      void main(){
+        vH = clamp(position.z / uDepth, 0.0, 1.0);
+        vP = position.xy;
+        vec4 w = modelMatrix * vec4(position, 1.0);
+        vW = w.xyz;
+        gl_Position = projectionMatrix * viewMatrix * w;
+      }`,
+    fragmentShader: /* glsl */`
+      uniform vec3  uColor;
+      uniform vec2  uCenter;
+      uniform float uWave;
+      uniform float uHover;
+      varying float vH;
+      varying vec3  vW;
+      varying vec2  vP;
+      ${LAND_GLSL}
+      void main(){
+        float d = length(vW.xy - uCenter);
+        vec3  col = mix(uColor * 0.016, uColor * 0.052, pow(vH, 0.85));
+        /* 扫光光带 */
+        float sweep = 1.0 - smoothstep(0.0, 0.42, abs(d - uWave));
+        col += uColor * sweep * 0.32 * (0.15 + 0.85 * pow(vH, 1.4));
+
+        /* 顶部 30% 渗入顶面地类色，让侧壁与顶面不脱节 */
+        sampleLand(vP, 1.4);
+        col += landColor() * 0.040 * smoothstep(0.35, 1.0, vH);
+
+        /* 顶部棱线（极窄） */
+        col += uColor * smoothstep(0.93, 1.0, vH) * 0.12;
+        col += uColor * 0.34 * uHover;
+        gl_FragColor = vec4(col, 1.0);
+      }`,
+    side: THREE.DoubleSide
+  });
+}
+
+/* ---- 轮廓飞线：沿路径流动的高亮 ---- */
+function flowLineMaterial(hex, speed = CONFIG.flow.speed, pulses = 3) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uColor:  { value: new THREE.Color(hex) },
+      uTime:   { value: 0 },
+      uSpeed:  { value: speed },
+      uPulses: { value: pulses }
+    },
+    vertexShader: /* glsl */`
+      attribute float aT;
+      varying float vT;
+      void main(){
+        vT = aT;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: /* glsl */`
+      uniform vec3  uColor;
+      uniform float uTime;
+      uniform float uSpeed;
+      uniform float uPulses;
+      varying float vT;
+      void main(){
+        float acc = 0.0;
+        for (int i = 0; i < 4; i++) {
+          if (float(i) >= uPulses) break;
+          float t = fract(vT - uTime * uSpeed + float(i) / uPulses);
+          acc += pow(t, 22.0);                 // 彗星头 + 拖尾
+        }
+        vec3 col = uColor * (0.60 + acc * 2.1) + vec3(acc * 0.25);
+        float a  = 0.62 + acc;
+        gl_FragColor = vec4(col, a);
+      }`,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  });
+}
+
+function makeFlowLine(pts2d, z, hex, speed, pulses) {
+  const zAt = typeof z === 'function' ? z : () => z;
+  const pos = [], ts = [];
+  let total = 0;
+  for (let i = 0; i < pts2d.length - 1; i++) total += pts2d[i].distanceTo(pts2d[i + 1]);
+  let acc = 0;
+  for (let i = 0; i < pts2d.length; i++) {
+    pos.push(pts2d[i].x, pts2d[i].y, zAt(pts2d[i]));
+    if (i > 0) acc += pts2d[i].distanceTo(pts2d[i - 1]);
+    ts.push(acc / total);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('aT', new THREE.Float32BufferAttribute(ts, 1));
+  const mat = flowLineMaterial(hex, speed, pulses);
+  return new THREE.Line(geo, mat);
+}
+
+/* ============================================================
+   ⑤ 地图主体
+   ============================================================ */
+const mapGroup = new THREE.Group();
+mapGroup.rotation.z = CONFIG.geo.yaw;
+mapGroup.position.set(-0.40, 0.62, 0);   // 轻微偏转，让狭长市域更好地适配横向画面
+scene.add(mapGroup);
+
+const HUB = new THREE.Vector2(px(CONFIG.hub[0]), py(CONFIG.hub[1]));
+const centerUniform = { x: HUB.x, y: HUB.y };
+
+const districtMeshes = [];
+const flowMats = [];
+const topMats = [];
+const sideMats = [];
+
+/* 5.1 区县挤出体 */
+GEO.features.forEach(f => {
+  const zone = CONFIG.zone[f.properties.zone] ? f.properties.zone : 'mid';
+  const depth = CONFIG.extrude[zone];
+  const hex = CONFIG.zone[zone].color;
+  const polys = f.geometry.coordinates;
+
+  const topMat = topMaterial(hex);
+  const sideMat = sideMaterial(hex, depth);
+  topMat.uniforms.uCenter.value.set(centerUniform.x, centerUniform.y);
+  sideMat.uniforms.uCenter.value.set(centerUniform.x, centerUniform.y);
+  topMats.push(topMat);
+  sideMats.push(sideMat);
+
+  polys.forEach(poly => {
+    const mesh = new THREE.Mesh(buildExtrude(poly, depth), [topMat, sideMat]);
+    mesh.name = f.properties.name;
+    mesh.userData = { ...f.properties, depth, hover: 0 };
+    mapGroup.add(mesh);
+    districtMeshes.push(mesh);
+  });
+});
+
+/* 5.2 区县边界细线（顶面，按地貌分区着色 —— 用色边表达分区，顶面保持深色） */
+GEO.features.forEach(f => {
+  const zone = f.properties.zone;
+  const depth = CONFIG.extrude[zone] || CONFIG.extrude.mid;
+  const segs = [];
+  f.geometry.coordinates.forEach(poly => {
+    poly.forEach(ring => {
+      const v = ringToV2(ring);
+      for (let i = 0; i < v.length - 1; i++) {
+        segs.push(v[i].x, v[i].y, depth + 0.003, v[i + 1].x, v[i + 1].y, depth + 0.003);
+      }
+    });
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(segs, 3));
+  mapGroup.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({
+    color: new THREE.Color(CONFIG.zone[zone].color).multiplyScalar(0.55),
+    transparent: true, opacity: 0.55,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  })));
+});
+
+/* 5.3 市域轮廓飞线 —— 高度自动贴合各区县挤出顶面 */
+{
+  // 射线法：判断点落在哪个区县内，从而取该区县的挤出高度
+  const TOPS = GEO.features.map(f => ({
+    depth: CONFIG.extrude[f.properties.zone] || CONFIG.extrude.mid,
+    rings: f.geometry.coordinates.map(poly => poly[0].map(([lon, lat]) => new THREE.Vector2(px(lon), py(lat))))
+  }));
+  const inRing = (x, y, r) => {
+    let inside = false;
+    for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+      const xi = r[i].x, yi = r[i].y, xj = r[j].x, yj = r[j].y;
+      if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  };
+  const depthAt = v => {
+    for (const d of TOPS) for (const r of d.rings) if (inRing(v.x, v.y, r)) return d.depth;
+    let best = Infinity, dep = CONFIG.extrude.mid;
+    for (const d of TOPS) for (const r of d.rings) for (const p of r) {
+      const dist = (p.x - v.x) ** 2 + (p.y - v.y) ** 2;
+      if (dist < best) { best = dist; dep = d.depth; }
+    }
+    return dep;
+  };
+
+  const rings = OUTL.features[0].geometry.coordinates;
+  const main = ringToV2(rings[0][0]);
+
+  // 顶面轮廓飞线（沿真实地形起伏）
+  mapGroup.add(makeFlowLine(main, v => depthAt(v) + 0.014, '#7fe4ff', CONFIG.flow.speed, 3));
+  // 地面投影轮廓（常亮细线）
+  mapGroup.add(makeFlowLine(main, 0.005, '#2f8fc4', CONFIG.flow.speed * 0.7, 2));
+
+  for (let i = 1; i < Math.min(rings.length, 3); i++) {
+    mapGroup.add(makeFlowLine(ringToV2(rings[i][0]), 0.005, '#2f8fc4', CONFIG.flow.speed * 0.7, 2));
+  }
+  flowMats.push(...mapGroup.children.filter(o => o.isLine && o.material.uniforms).map(o => o.material));
+}
+
+/* 5.4 飞线弧（市中心 → 各区县） */
+const spriteTex = (() => {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const ctx = c.getContext('2d');
+  const grd = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grd.addColorStop(0, 'rgba(255,255,255,1)');
+  grd.addColorStop(0.25, 'rgba(150,235,255,.85)');
+  grd.addColorStop(1, 'rgba(80,200,255,0)');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+})();
+
+function glowSprite(size, hex) {
+  const m = new THREE.SpriteMaterial({
+    map: spriteTex, color: new THREE.Color(hex), transparent: true,
+    blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false
+  });
+  const s = new THREE.Sprite(m);
+  s.scale.set(size, size, 1);
+  return s;
+}
+
+const flyCurves = [];
+GEO.features.forEach(f => {
+  const zone = f.properties.zone;
+  const depth = CONFIG.extrude[zone];
+  const end = new THREE.Vector3(px(f.properties.center[0]), py(f.properties.center[1]), depth + 0.06);
+  const start = new THREE.Vector3(HUB.x, HUB.y, 0.34);
+  const dist = start.distanceTo(end);
+  if (dist < 1.2) return;   // 中心城区本身不画弧
+
+  const mid = start.clone().lerp(end, 0.5);
+  mid.z += 0.55 + dist * 0.20;
+
+  const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
+  const tube = new THREE.TubeGeometry(curve, 64, 0.011, 5, false);
+  const mat = flowLineMaterial(CONFIG.zone[zone].color, 0.16 + Math.random() * 0.05, 1);
+
+  // tube 的 uv.x 沿路径分布，复用飞线着色器即可
+  const mesh = new THREE.Mesh(tube, mat);
+  // tube 几何没有 aT 属性，补充一份
+  const uv = tube.attributes.uv;
+  const arr = new Float32Array(uv.count);
+  for (let i = 0; i < uv.count; i++) arr[i] = uv.getX(i);
+  tube.setAttribute('aT', new THREE.BufferAttribute(arr, 1));
+  mesh.frustumCulled = false;
+  mapGroup.add(mesh);
+  flowMats.push(mat);
+  flyCurves.push(curve);
+
+  const dot = glowSprite(0.22, CONFIG.zone[zone].color);
+  dot.position.copy(end);
+  mapGroup.add(dot);
+});
+
+/* 5.5 市中心脉冲环 + 光点 */
+const pulseRing = (() => {
+  const g = new THREE.RingGeometry(0.16, 0.185, 64);
+  const m = new THREE.MeshBasicMaterial({
+    color: 0x8fefff, transparent: true, opacity: 0.85,
+    blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false
+  });
+  const mesh = new THREE.Mesh(g, m);
+  mesh.position.set(HUB.x, HUB.y, 0.36);
+  mapGroup.add(mesh);
+  return mesh;
+})();
+{
+  const s = glowSprite(0.22, "#ffffff");
+  s.position.set(HUB.x, HUB.y, 0.37);
+  mapGroup.add(s);
+}
+
+/* 5.5b 地图底部柔光（把地图从背景中托起） */
+{
+  const g = new THREE.PlaneGeometry(26, 26);
+  const m = new THREE.ShaderMaterial({
+    uniforms: { uColor: { value: new THREE.Color('#1b6f9e') } },
+    vertexShader: /* glsl */`
+      varying vec2 vUv;
+      void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: /* glsl */`
+      uniform vec3 uColor;
+      varying vec2 vUv;
+      void main(){
+        float r = length(vUv - 0.5) * 2.0;
+        float a = pow(1.0 - clamp(r, 0.0, 1.0), 2.2) * 0.16;
+        gl_FragColor = vec4(uColor, a);
+      }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+  });
+  const plane = new THREE.Mesh(g, m);
+  plane.position.set(-0.2, 0.2, -0.14);
+  scene.add(plane);
+}
+
+/* 5.6 地面网格（深度参考） */
+{
+  const g = new THREE.PlaneGeometry(46, 46);
+  const m = new THREE.ShaderMaterial({
+    uniforms: { uColor: { value: new THREE.Color('#2c9fd8') } },
+    vertexShader: /* glsl */`
+      varying vec3 vW;
+      void main(){
+        vec4 w = modelMatrix * vec4(position, 1.0);
+        vW = w.xyz;
+        gl_Position = projectionMatrix * viewMatrix * w;
+      }`,
+    fragmentShader: /* glsl */`
+      uniform vec3 uColor;
+      varying vec3 vW;
+      void main(){
+        vec2 g  = abs(fract(vW.xy * 0.5 - 0.5) - 0.5) / fwidth(vW.xy * 0.5);
+        float l = 1.0 - min(min(g.x, g.y), 1.0);
+        float r = length(vW.xy);
+        float fade = smoothstep(13.0, 1.5, r);
+        gl_FragColor = vec4(uColor, l * fade * 0.26);
+      }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+  });
+  const plane = new THREE.Mesh(g, m);
+  plane.position.z = -0.30;
+  scene.add(plane);
+}
+
+/* ============================================================
+   ⑥ 区县标注（HTML 覆盖层）
+   ============================================================ */
+const labelLayer = document.getElementById('labels');
+// 中心城区一带标注密集，做少量像素级避让
+const LABEL_OFFSET = {
+  '于洪区': [-34, -20], '铁西区': [-44, 12], '浑南区': [56, 8],
+  '苏家屯区': [22, 30], '沈北新区': [-6, -14]
+};
+const LABELS = [
+  ...GEO.features
+      .filter(f => f.properties.areaWanMu > 60)
+      .map(f => ({
+        name: f.properties.name,
+        off: LABEL_OFFSET[f.properties.name] || [0, 0],
+        pos: new THREE.Vector3(px(f.properties.center[0]), py(f.properties.center[1]),
+              CONFIG.extrude[f.properties.zone] + 0.16)
+      })),
+  { name: '中心城区', cls: 'center-city', off: [0, 22], pos: new THREE.Vector3(HUB.x, HUB.y, 0.62) }
+];
+LABELS.forEach(l => {
+  const el = document.createElement('div');
+  el.className = 'dlabel' + (l.cls ? ' ' + l.cls : '');
+  el.textContent = l.name;
+  labelLayer.appendChild(el);
+  l.el = el;
+});
+
+/* ============================================================
+   ⑦ 悬停交互
+   ============================================================ */
+const ray = new THREE.Raycaster();
+const ptr = new THREE.Vector2(-10, -10);
+const tip = document.getElementById('tip');
+let hovered = null;
+
+renderer.domElement.addEventListener('pointermove', e => {
+  const r = renderer.domElement.getBoundingClientRect();
+  ptr.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+  ptr.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+  tip.style.left = e.clientX + 'px';
+  tip.style.top = e.clientY + 'px';
+});
+renderer.domElement.addEventListener('pointerleave', () => ptr.set(-10, -10));
+
+function updateHover() {
+  ray.setFromCamera(ptr, camera);
+  const hits = ray.intersectObjects(districtMeshes, false);
+  const hit = hits.length ? hits[0].object : null;
+
+  districtMeshes.forEach(m => {
+    const want = (m === hit) ? 1 : 0;
+    m.userData.hover += (want - m.userData.hover) * 0.18;
+  });
+
+  if (hit !== hovered) {
+    hovered = hit;
+    if (hit) {
+      const d = hit.userData;
+      tip.querySelector('#tipName').textContent = d.name;
+      tip.querySelector('#tipZone').textContent = d.zoneLabel;
+      tip.querySelector('#tipArea').textContent = d.areaWanMu + ' 万亩';
+      tip.style.opacity = 1;
+      renderer.domElement.style.cursor = 'pointer';
+    } else {
+      tip.style.opacity = 0;
+      renderer.domElement.style.cursor = 'grab';
+    }
+  }
+}
+
+/* ============================================================
+   ⑧ 渲染循环
+   ============================================================ */
+const clock = new THREE.Clock();
+const projV = new THREE.Vector3();
+
+function tick() {
+  const t = clock.getElapsedTime();
+
+  // 侧边扫光：光带自中心向外扩散
+  const wave = (t * CONFIG.flow.sweep) % 15.5;
+  TEX.w1 += ((TEX.on1 ? 1 : 0) - TEX.w1) * 0.12;      // 图层开关平滑过渡
+  TEX.w2 += ((TEX.on2 ? 1 : 0) - TEX.w2) * 0.12;
+  sideMats.forEach(m => {
+    m.uniforms.uWave.value = wave;
+    m.uniforms.uHover.value = 0;
+    m.uniforms.uW1.value = TEX.w1;
+    m.uniforms.uW2.value = TEX.w2;
+  });
+  districtMeshes.forEach(m => {
+    m.material[0].uniforms.uHover.value = m.userData.hover;
+    m.material[1].uniforms.uHover.value = m.userData.hover;
+  });
+  topMats.forEach(m => {
+    m.uniforms.uTime.value = t;
+    m.uniforms.uW1.value = TEX.w1;
+    m.uniforms.uW2.value = TEX.w2;
+  });
+
+  flowMats.forEach(m => { if (m.uniforms && m.uniforms.uTime) m.uniforms.uTime.value = t; });
+
+  // 中心脉冲环
+  const k = (t * 0.55) % 1;
+  pulseRing.scale.setScalar(1 + k * 3.4);
+  pulseRing.material.opacity = 0.85 * (1 - k);
+
+  updateHover();
+  controls.update();
+  composer.render();
+
+  // 标注投影
+  const w = W(), h = H();
+  LABELS.forEach(l => {
+    projV.copy(l.pos).applyMatrix4(mapGroup.matrixWorld).project(camera);
+    const vis = projV.z < 1;
+    l.el.style.opacity = vis ? 1 : 0;
+    if (vis) {
+      l.el.style.left = ((projV.x * 0.5 + 0.5) * w + l.off[0]) + 'px';
+      l.el.style.top = ((-projV.y * 0.5 + 0.5) * h + l.off[1]) + 'px';
+    }
+  });
+
+  requestAnimationFrame(tick);
+}
+tick();
+
+/* ============================================================
+   ⑨ 自适应 / 交互按钮
+   ============================================================ */
+function resize() {
+  const w = W(), h = H();
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  composer.setSize(w, h);
+  bloomPass.resolution.set(w, h);
+}
+window.addEventListener('resize', () => { resize(); fitScreen(); });
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  camera.position.set(...CONFIG.camera.position);
+  controls.target.set(...CONFIG.camera.target);
+  controls.update();
+});
+
+/* 图层开关：耕地红线图 / 用地现状图 */
+document.querySelectorAll('.lg-switch b').forEach(el => {
+  el.addEventListener('click', () => {
+    const on = !el.classList.contains('on');
+    el.classList.toggle('on', on);
+    if (el.dataset.layer === '1') TEX.on1 = on; else TEX.on2 = on;
+  });
+});
+
+/* 大屏等比缩放 */
+function fitScreen() {
+  const s = Math.min(innerWidth / 1920, innerHeight / 1080);
+  const sc = document.getElementById('screen');
+  if (sc) sc.style.transform = `scale(${s})`;
+  /* 竖屏小屏（手机）：提示横屏，双指可自行缩放页面看细节
+     注意 #rot 在脚本之后，打包成普通 script 同步执行时可能还没解析到 */
+  const rot = document.getElementById('rot');
+  if (rot) rot.hidden = !(innerHeight > innerWidth && innerWidth < 900);
+}
+fitScreen();
+resize();
+
+/* 首帧画完之后撤掉兜底层：在这之前 boot 一直盖着，看不到空白地图 */
+requestAnimationFrame(() => {
+  window.__MAP_READY = true;
+  const bootEl = document.getElementById('boot');
+  if (bootEl) bootEl.classList.add('is-done');
+});
+</script>
+<div id="rot" hidden>这是一个 1920×1080 的横屏大屏，<b>请把手机横过来</b>观看，或双指放大查看细节</div>
+
+<!-- ============================================================
+     兜底脚本（普通 script，不依赖 ES Module）
+     作用：即使 three.js 加载失败 / WebGL 不可用，
+          页面仍然等比缩放、并且明确告诉你为什么看不到地图，
+          而不是只剩一块空白背景。
+     ============================================================ -->
+<script>
+(function () {
+  var screen = document.getElementById('screen');
+  var rot = document.getElementById('rot');
+  var boot = document.getElementById('boot');
+  var bootTitle = document.getElementById('bootTitle');
+  var bootMsg = document.getElementById('bootMsg');
+
+  /* 1. 等比缩放：放在模块之外，保证一定能执行 */
+  function fit() {
+    var s = Math.min(innerWidth / 1920, innerHeight / 1080);
+    if (screen) screen.style.transform = 'scale(' + s + ')';
+    if (rot) rot.hidden = !(innerHeight > innerWidth && innerWidth < 900);
+  }
+  fit();
+  addEventListener('resize', fit);
+  addEventListener('orientationchange', fit);
+
+  /* 2. 失败提示：lock=true 表示这条信息已经足够明确，后面的不必再覆盖 */
+  var locked = false;
+  function fail(html, lock) {
+    if (locked || window.__MAP_READY || !boot) return;
+    locked = !!lock;
+    boot.classList.add('is-err');
+    if (bootTitle) bootTitle.textContent = '三维场景没能加载';
+    if (bootMsg) bootMsg.innerHTML = html;
+  }
+  function esc(s) { return String(s).replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  /* 打包后的主脚本若一启动就抛错，这里能拿到（它在兜底脚本之前执行） */
+  if (window.__BUNDLE_ERR) {
+    fail('脚本执行出错：<code>' + esc(window.__BUNDLE_ERR) + '</code>', true);
+  }
+
+  /* 3. 多种失败原因 → 人话 */
+  var FILE_HINT = '你正在用 <code>file://</code> 直接打开源文件，浏览器的 CORS 策略会拦掉所有 ES 模块。'
+    + '<br>请改开同目录下的 <code>index.standalone.html</code>（单文件版，双击即可）。';
+  var SRV_HINT = '主脚本没能启动。可能是 <code>vendor/</code>、<code>src/</code>、<code>textures/</code> 缺文件，'
+    + '或当前环境禁止了部分脚本能力。'
+    + '<br>建议用 Chrome / Edge / Safari 直接打开；本地调试请先 <code>python -m http.server</code>。';
+
+  /* 4. WebGL 预检（比让 three.js 抛错更早、更好懂） */
+  var hasGL = false;
+  try {
+    var c = document.createElement('canvas');
+    hasGL = !!(c.getContext('webgl2') || c.getContext('webgl') || c.getContext('experimental-webgl'));
+  } catch (e) { hasGL = false; }
+  if (!hasGL) {
+    fail('当前浏览器不支持 WebGL 或已被禁用。<br>请用 Chrome / Edge / Safari 打开，并确认没有关闭「硬件加速」。', true);
+  }
+
+  /* 5. 捕获模块加载与运行错误 */
+  function onErr(msg) {
+    if (window.__MAP_READY) return;
+    if (/^file:/.test(location.protocol)) return fail(FILE_HINT, true);
+    if (msg) return fail('脚本执行出错：<code>' + esc(msg) + '</code>', true);
+    fail('脚本执行出错（原因未知）。<br>按 F12 打开控制台可以看到详细报错。', false);
+  }
+  addEventListener('error', function (e) {
+    var t = (e && e.message) || '';
+    if (!t && e && e.target && e.target.src) t = '无法加载 ' + String(e.target.src).slice(-60);
+    onErr(t);
+  }, true);
+  addEventListener('unhandledrejection', function (e) {
+    var r = e && e.reason;
+    onErr(String((r && r.message) || r || ''));
+  });
+
+  /* 6. 看门狗：8 秒还没起来（前面没给出明确原因时才兜这句） */
+  setTimeout(function () {
+    if (window.__MAP_READY) return;
+    fail('三维模块 8 秒内没有启动。<br>' + (/^file:/.test(location.protocol) ? FILE_HINT : SRV_HINT), true);
+  }, 8000);
+})();
+</script>
+</body>
+</html>
